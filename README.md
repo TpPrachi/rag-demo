@@ -1,14 +1,85 @@
-Ollam official installer: 
+# RAG Demo with Node.js
+
+A Retrieval-Augmented Generation (RAG) application built with Node.js that works locally using Ollama and can be switched to Anthropic Claude for production.
+
+## What is RAG?
+
+RAG combines a retrieval system with a Large Language Model (LLM). Instead of relying on the model's training data, it:
+1. **Retrieves** relevant chunks from your documents
+2. **Augments** the prompt with that context
+3. **Generates** an answer grounded in your documents
+
+## Features
+
+- 📄 Load real documents (`.txt` and `.pdf`)
+- 🔍 TF-IDF based retrieval
+- 🦙 Local inference with Ollama (free, offline)
+- ☁️ Switch to Anthropic Claude for production
+- 📦 Auto chunking of large documents
+
+## Project Structure
+
+rag-demo/
+
+├── index.js          # Main RAG pipeline
+
+├── vectorStore.js    # TF-IDF retrieval
+
+├── loader.js         # Document loader (txt + pdf)
+
+├── documents/        # Drop your files here
+
+└── package.json
+
+## Prerequisites
+
+- Node.js v18+
+- [Ollama](https://ollama.com) installed locally
+
+## Setup
+
+### 1. Clone the repo
+```bash
+git clone https://github.com/TpPrachi/rag-demo.git
+cd rag-demo
+```
+
+### 2. Install dependencies
+```bash
+npm install
+```
+
+### 3. Install Ollama & pull a model
+```bash
+# Linux
 curl -fsSL https://ollama.com/install.sh | sh
 
-
-Pull a model and start:
+# Pull the model
 ollama pull llama3.2
-ollama serve       # if it didn't start automatically
+```
 
-Verify it's running:
-curl http://localhost:11434
-# should return: Ollama is running
+### 4. Add your documents
+Drop any `.txt` or `.pdf` files into the `documents/` folder.
 
-Run Node Application:
-node index.js
+## Usage
+
+### Run locally (free, uses Ollama)
+```bash
+node index.js "Your question here"
+```
+
+### Run in production (uses Anthropic Claude)
+```bash
+ANTHROPIC_API_KEY=sk-ant-... NODE_ENV=production node index.js "Your question here"
+```
+
+## Switching Between Providers
+
+| Environment | `NODE_ENV` | Model |
+|---|---|---|
+| Local dev | unset | Ollama llama3.2 |
+| Production | `production` | Anthropic claude-sonnet-4-6 |
+
+No code changes needed — just set the environment variable.
+
+## How It Works
