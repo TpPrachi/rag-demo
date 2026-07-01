@@ -83,3 +83,48 @@ ANTHROPIC_API_KEY=sk-ant-... NODE_ENV=production node index.js "Your question he
 No code changes needed — just set the environment variable.
 
 ## How It Works
+
+Your Question
+
+│
+
+▼
+
+┌─────────────┐
+
+│   Retrieve  │  ← TF-IDF cosine similarity search
+
+│  top K docs │
+
+└─────────────┘
+
+│
+
+▼
+
+┌─────────────┐
+
+│   Augment   │  ← Inject chunks into system prompt
+
+│   prompt    │
+
+└─────────────┘
+
+│
+
+▼
+
+┌─────────────┐
+
+│  Generate   │  ← Ollama or Claude answers
+
+│   answer    │
+
+└─────────────┘
+
+## Next Steps
+
+- [ ] Semantic search with embeddings
+- [ ] Streaming responses
+- [ ] Persistent vector store
+- [ ] Support more file types (docx, csv)
