@@ -122,6 +122,32 @@ Your Question
 
 └─────────────┘
 
+## Vector Store
+
+This project uses **ChromaDB** as the vector database with **Ollama nomic-embed-text** for semantic embeddings.
+
+### Why Chroma?
+| Feature | Chroma | Pinecone | Weaviate |
+|---|---|---|---|
+| Free | ✅ fully | ✅ free tier | ✅ free tier |
+| Local | ✅ yes | ❌ cloud only | ⚠️ cloud/self-host |
+| Setup | simple | API key needed | Docker needed |
+| Industry use | ✅ widely used | ✅ widely used | ✅ widely used |
+
+### Architecture
+```
+Documents → Chunking → Ollama Embeddings → ChromaDB
+                                               ↑
+Query → Ollama Embedding → Semantic Search ────┘
+                                ↓
+                         Top K chunks → LLM → Answer
+```
+
+### Start Chroma
+```bash
+chroma run --path ./chroma-data
+```
+
 ## Next Steps
 
 - [ ] Semantic search with embeddings
