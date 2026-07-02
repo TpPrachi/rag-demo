@@ -1,58 +1,53 @@
-// Simple TF-IDF + cosine similarity (no external vector DB needed)
-export function tokenize(text) {
-  return text.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/);
-}
+import { ChromaClient } from 'chromadb';
+import { getEmbedding, getEmbeddings } from './embedder.js';
 
-export function buildTFIDF(docs) {
-  const N = docs.length;
-  const df = {};
-  const tfs = docs.map(doc => {
-    const tokens = tokenize(doc);
-    const tf = {};
-    for (const t of tokens) tf[t] = (tf[t] || 0) + 1 / tokens.length;
-    for (const t of Object.keys(tf)) df[t] = (df[t] || 0) + 1;
-    return tf;
+const client = new ChromaClient({ path: 'http://localhost:8000' });
+const COLLECTION_NAME = 'rag-demo';
+
+// ── Index documents ───────────────────────────────────────────────
+export async function indexDocuments(chunks) {
+  // Delete old collection if exists and recreate
+  try {
+    await client.deleteCollection({ name: COLLECTION_NAME });
+  } catch {}
+
+  const collection = await client.createCollection({
+    name: COLLECTION_NAME,
+    metadata: { 'hnsw:space': 'cosine' },
   });
 
-  const idf = {};
-  for (const t in df) idf[t] = Math.log(N / df[t]);
+  console.log(`🔢 Generating embeddings for ${chunks.length} chunks...`);
+  const embeddings = await getEmbeddings(chunks);
 
-  return tfs.map(tf => {
-    const vec = {};
-    for (const t in tf) vec[t] = tf[t] * (idf[t] || 0);
-    return vec;
-  });
-}
+  // Add in batches of 50
+  const batchSize = 50;
+  for (let i = 0; i < chunks.length; i += batchSize) {
+    const batch = chunks.slice(i, i + batchSize);
+    const batchEmbeddings = embeddings.slice(i, i + batchSize);
 
-function cosineSim(a, b) {
-  let dot = 0, normA = 0, normB = 0;
-  const allKeys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  for (const k of allKeys) {
-    dot   += (a[k] || 0) * (b[k] || 0);
-    normA += (a[k] || 0) ** 2;
-    normB += (b[k] || 0) ** 2;
+    await collection.add({
+      ids:        batch.map((_, j) => `chunk-${i + j}`),
+      embeddings: batchEmbeddings,
+      documents:  batch,
+    });
+    console.log(`  indexed batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(chunks.length / batchSize)}`);
   }
-  return normA && normB ? dot / (Math.sqrt(normA) * Math.sqrt(normB)) : 0;
+
+  console.log(`✅ Indexed ${chunks.length} chunks into Chroma\n`);
 }
 
-export function retrieveTopK(query, docs, vectors, k = 3) {
-  const qTokens = tokenize(query);
-  const qTF = {};
-  for (const t of qTokens) qTF[t] = (qTF[t] || 0) + 1 / qTokens.length;
+// ── Retrieve top K ────────────────────────────────────────────────
+export async function retrieveTopK(query, k = 3) {
+  const collection = await client.getCollection({ name: COLLECTION_NAME });
+  const queryEmbedding = await getEmbedding(query);
 
-  // Reuse IDF from corpus (rebuild quickly)
-  const allVectors = buildTFIDF([query, ...docs]);
-  const qVec = allVectors[0];
-  const docVecs = allVectors.slice(1);
+  const results = await collection.query({
+    queryEmbeddings: [queryEmbedding],
+    nResults: k,
+  });
 
-  const scored = docs.map((doc, i) => ({
+  return results.documents[0].map((doc, i) => ({
     doc,
-    score: cosineSim(qVec, docVecs[i]),
+    score: 1 - results.distances[0][i],
   }));
-
-  return scored
-    .sort((a, b) => b.score - a.score)
-    .slice(0, k)
-    .filter(r => r.score > 0)
-    .map(r => r.doc);
 }

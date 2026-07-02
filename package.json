@@ -3,7 +3,11 @@
   "type": "module",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
-    "ollama": "^0.5.0",
-    "pdf-parse": "^1.1.1"
+    "@lancedb/lancedb": "^0.30.0",
+    "axios": "^1.18.1",
+    "chromadb": "^3.5.0",
+    "ollama": "^0.5.18",
+    "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^6.1.200"
   }
 }

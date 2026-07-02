@@ -1,7 +1,7 @@
 import { Ollama } from 'ollama';
 import Anthropic from '@anthropic-ai/sdk';
-import { buildTFIDF, retrieveTopK } from './vectorStore.js';
 import { loadDocumentsFromFolder } from './loader.js';
+import { indexDocuments, retrieveTopK } from './vectorStore.js';
 
 // ── Provider config ───────────────────────────────────────────────
 const USE_OLLAMA = process.env.NODE_ENV !== 'production';
@@ -10,27 +10,46 @@ const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 
 console.log(`🔧 Using: ${USE_OLLAMA ? `Ollama (${OLLAMA_MODEL})` : `Anthropic (${ANTHROPIC_MODEL})`}\n`);
 
-// ── Load documents from folder ────────────────────────────────────
-const rawDocs = await loadDocumentsFromFolder('./documents');
-
-// Chunk each doc into ~500 char pieces
-function chunkText(text, size = 500, overlap = 50) {
+// ── Smart chunking ────────────────────────────────────────────────
+function chunkText(text, maxChunkSize = 500, overlap = 1) {
+  const paragraphs = text.split(/\n{2,}/).map(p => p.trim()).filter(p => p.length > 0);
   const chunks = [];
-  let i = 0;
-  while (i < text.length) {
-    chunks.push(text.slice(i, i + size));
-    i += size - overlap;
+  let currentChunk = [];
+  let currentSize = 0;
+
+  for (const paragraph of paragraphs) {
+    const sentences = paragraph.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(s => s.length > 0);
+
+    for (const sentence of sentences) {
+      if (currentSize + sentence.length > maxChunkSize && currentChunk.length > 0) {
+        chunks.push(currentChunk.join(' '));
+        currentChunk = currentChunk.slice(-overlap);
+        currentSize = currentChunk.join(' ').length;
+      }
+      currentChunk.push(sentence);
+      currentSize += sentence.length;
+    }
+
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk.join(' '));
+      currentChunk = [];
+      currentSize = 0;
+    }
   }
+
+  if (currentChunk.length > 0) chunks.push(currentChunk.join(' '));
   return chunks;
 }
 
-const documents = rawDocs.flatMap(({ file, text }) =>
-  chunkText(text).map(chunk => `[${file}] ${chunk}`)
-);
+// ── Load & index documents ────────────────────────────────────────
+const rawDocs = await loadDocumentsFromFolder('./documents');
+const documents = rawDocs.flatMap(({ file, text }) => {
+  const chunks = chunkText(text);
+  console.log(`  → ${file}: ${chunks.length} chunk(s)`);
+  return chunks.map((chunk, i) => `[${file} chunk ${i + 1}] ${chunk}`);
+});
 
-console.log(`📦 Total chunks indexed: ${documents.length}\n`);
-
-const vectors = buildTFIDF(documents);
+await indexDocuments(documents);
 
 // ── Unified LLM call ──────────────────────────────────────────────
 async function callLLM(systemPrompt, userMessage) {
@@ -60,13 +79,16 @@ async function callLLM(systemPrompt, userMessage) {
 async function ragQuery(userQuestion) {
   console.log(`❓ Question: ${userQuestion}`);
 
-  const relevant = retrieveTopK(userQuestion, documents, vectors, 3);
-  console.log(`📚 Retrieved ${relevant.length} chunk(s):`);
-  relevant.forEach((c, i) => console.log(`  [${i + 1}] ${c.slice(0, 100)}...`));
+  const results = await retrieveTopK(userQuestion, 3);
+  console.log(`\n📚 Retrieved ${results.length} chunk(s):`);
+  results.forEach((r, i) =>
+    console.log(`  [${i + 1}] (score: ${r.score.toFixed(3)}) ${r.doc.slice(0, 100)}...`)
+  );
 
-  const context = relevant.join('\n\n');
+  const context = results.map(r => r.doc).join('\n\n');
   const systemPrompt = `You are a helpful assistant. Answer using ONLY the context below.
-If the context lacks enough info, say so honestly.
+If the answer is not in the context, say "I don't know based on the provided documents."
+Do NOT use your own training knowledge.
 
 CONTEXT:
 ${context}`;
@@ -76,6 +98,6 @@ ${context}`;
   return answer;
 }
 
-// ── Run a query ───────────────────────────────────────────────────
-const question = process.argv[2] || 'Summarize the documents.';
+// ── Run ───────────────────────────────────────────────────────────
+const question = process.argv[2] || 'What are the main topics covered?';
 await ragQuery(question);
