@@ -1,7 +1,11 @@
 import { ChromaClient } from 'chromadb';
 import { getEmbedding, getEmbeddings } from './embedder.js';
 
-const client = new ChromaClient({ path: 'http://localhost:8000' });
+const client = new ChromaClient({
+  host: 'localhost',
+  port: 8000,
+  ssl: false,
+});
 const COLLECTION_NAME = 'rag-demo';
 
 // ── Index documents ───────────────────────────────────────────────
@@ -9,11 +13,12 @@ export async function indexDocuments(chunks) {
   // Delete old collection if exists and recreate
   try {
     await client.deleteCollection({ name: COLLECTION_NAME });
-  } catch {}
+  } catch { }
 
   const collection = await client.createCollection({
     name: COLLECTION_NAME,
     metadata: { 'hnsw:space': 'cosine' },
+    embeddingFunction: null,
   });
 
   console.log(`🔢 Generating embeddings for ${chunks.length} chunks...`);
@@ -26,9 +31,9 @@ export async function indexDocuments(chunks) {
     const batchEmbeddings = embeddings.slice(i, i + batchSize);
 
     await collection.add({
-      ids:        batch.map((_, j) => `chunk-${i + j}`),
+      ids: batch.map((_, j) => `chunk-${i + j}`),
       embeddings: batchEmbeddings,
-      documents:  batch,
+      documents: batch,
     });
     console.log(`  indexed batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(chunks.length / batchSize)}`);
   }
@@ -38,7 +43,10 @@ export async function indexDocuments(chunks) {
 
 // ── Retrieve top K ────────────────────────────────────────────────
 export async function retrieveTopK(query, k = 3) {
-  const collection = await client.getCollection({ name: COLLECTION_NAME });
+  const collection = await client.getCollection({
+    name: COLLECTION_NAME,
+    embeddingFunction: null,
+  });
   const queryEmbedding = await getEmbedding(query);
 
   const results = await collection.query({

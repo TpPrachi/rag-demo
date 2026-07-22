@@ -1,13 +1,28 @@
 {
   "name": "rag-demo",
   "type": "module",
+  "scripts": {
+    "server": "node server/index.js",
+    "client": "vite",
+    "dev": "concurrently \"npm run server\" \"npm run client\""
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@lancedb/lancedb": "^0.30.0",
     "axios": "^1.18.1",
-    "chromadb": "^3.5.0",
-    "ollama": "^0.5.18",
-    "pdf-parse": "^1.1.1",
-    "pdfjs-dist": "^6.1.200"
+    "chromadb": "^1.5.9",
+    "cors": "^2.8.5",
+    "express": "^4.18.0",
+    "multer": "^2.2.0",
+    "ollama": "^0.5.0",
+    "pdf-parse": "^2.4.5",
+    "pdfjs-dist": "^4.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.0.0",
+    "concurrently": "^8.0.0",
+    "vite": "^5.0.0"
   }
 }
