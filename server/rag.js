@@ -62,8 +62,11 @@ export async function streamRAGResponse(question, onChunk, onSources) {
     onSources(allResults.map(r => ({ doc: r.doc, score: r.score })));
 
     const context = allResults.map(r => r.doc).join('\n\n');
-    const systemPrompt = `You are a helpful assistant. Answer using ONLY the context below.
-If the answer is not in the context, say "I don't know based on the provided documents."
+    const systemPrompt = `You are a helpful assistant for the RAG Demo application.
+Answer using the context below. If the question is a shorter version of something
+covered in the context (e.g. "What is RAG?" means "What is Retrieval-Augmented Generation?"),
+still answer it using the context.
+If the answer is truly not in the context, say "I don't know based on the provided documents."
 Do NOT use your own training knowledge.
 
 CONTEXT:
